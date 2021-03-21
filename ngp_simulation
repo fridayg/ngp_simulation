@@ -1,0 +1,56 @@
+CREATE OR REPLACE TABLE `demswasp.sbx_guilbertf.ngp_report` AS
+SELECT
+    # I want to keep this information at the person level so that GDS can do the partitioning work for me
+    u.identifier,
+    # Age is included both grouped and ungrouped for different types of graphs
+    CASE WHEN u.age <= 25 THEN "18-25"
+    WHEN u.age >25 AND u.age <= 40 THEN "25-40"
+    WHEN u.age > 40 AND u.age <= 65 THEN "40-65"
+    WHEN u.age > 65 THEN "65+"
+    ELSE "Not Reported"
+    END AS age_grouped,
+    u.age, 
+    # Renaming gender because I want to say "Not Reported"
+    CASE WHEN u.gender = 'Female' THEN 'Female'
+    WHEN u.gender = 'Male' THEN 'Male'
+    ELSE 'Not Reported' END AS gender,
+    u.race,
+    # geographic information
+    u.city,
+    u.county,
+    u.state,
+    u.zip,
+    # score grouped and ungrouped for different graphing
+    CASE WHEN u.college_degree_likelihood_score <= 20 THEN "0-20"
+    WHEN u.college_degree_likelihood_score >20 AND u.college_degree_likelihood_score <= 40 THEN "20-40"
+    WHEN u.college_degree_likelihood_score >40 AND u.college_degree_likelihood_score <= 60 THEN "40-60"
+    WHEN u.college_degree_likelihood_score >60 AND u.college_degree_likelihood_score <= 80 THEN "60-80"
+    WHEN u.college_degree_likelihood_score >80 AND u.college_degree_likelihood_score <= 100 THEN "80-100"
+    ELSE "Unscored"
+    END AS college_degree_likelihood_grouped,
+    u.college_degree_likelihood_score,
+    # renaming the "has good cell" flag to look better in graphs
+    CASE WHEN u.has_good_cell_phone = 1 THEN "Has Good Cell"
+    ELSE "No Good Cell"
+    END AS cell_status,
+    # attempt info - renamed for clarity because contact sometimes refers to a successful attempt
+    a.contact_type as attempt_type,
+    a.date_canvassed_only,
+    a.result_type,
+    # including identifier from the attempt table to see distinct people attempted
+    a.identifier as people_attempted,
+    # including the contact identifier from the attempt table to see total attempts
+    COUNT(a.contact_identifier) as attempts,
+    # counting all "collected ID" survey responses to see the total number of contacts
+    COUNT(IF(a.result_type = "Collected ID", a.contact_identifier, null)) AS contacts,
+    # counting each person with a "collected ID" survey response to get unique people contacted
+    COUNT(DISTINCT(IF(a.result_type = "Collected ID", a.identifier, null))) AS people_contacted,
+FROM
+    # starting with table of all people in universe
+    `demswasp.sbx_guilbertf.ngp_universe` as u
+LEFT JOIN
+    # add in attempts joining on the personl level identifier
+    `demswasp.sbx_guilbertf.ngp_attempts` as a
+    ON u.identifier = a.identifier
+GROUP BY
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
